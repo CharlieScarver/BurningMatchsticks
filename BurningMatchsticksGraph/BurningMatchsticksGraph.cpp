@@ -14,11 +14,39 @@
 
 #define INPUT_FILE "ex-2.txt"
 
+struct Node {
+    float x;
+    float y;
+    int index; // index in the matrix and other arrays
+    float ecc = 0; // eccentricity
+
+    Node(float x, float y, int index) {
+        this->x = x;
+        this->y = y;
+        this->index = index;
+    }
+};
+
+int findNode(std::vector<Node> nodes, float x, float y) {
+    for (int i = 0; i < nodes.size(); i++)
+    {
+        if (nodes[i].x == x && nodes[i].y == y) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+bool sortByEcc(Node a, Node b) {
+    return a.ecc < b.ecc;
+}
+
 int main()
 {
     std::cout << "Burning matchsticks\n\n";
 
-    std::ifstream ifs(INPUT_FILE);
+    std::ifstream ifs("ex-2.txt");
     if (!ifs.is_open())
     {
         std::cout << "Unable to open file" << std::endl;
@@ -52,14 +80,14 @@ int main()
         }
     }
 
-    std::unordered_map<std::string, int> coordToIndex;
-    int nextMapIndex = 0; // vertex count
+    std::vector<Node> nodes; // list of all vertexes
     std::string keyDelim = ", ";
     char names[26] = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' }; // vertex names
     std::cout << "Vertex => Name" << std::endl;
 
     for (int i = 0, initN = n; i < initN; i++)
     {
+        // Read a line of the input
         int x1, y1, x2, y2; // edge coordinates and weight
         float t;
         ifs >> x1 >> y1 >> x2 >> y2 >> t;
@@ -69,35 +97,32 @@ int main()
             return 3;
         }
 
-        // Map (x,y) tuple to vertex index
-        std::string key1 = std::to_string(x1) + keyDelim + std::to_string(y1);
-        if (coordToIndex.find(key1) == coordToIndex.end()) { // not found
-            coordToIndex.emplace(key1, nextMapIndex);
-            std::cout << key1 << "  =>  " << names[nextMapIndex] << std::endl;
-            nextMapIndex++;
+        // Check if the read vertexes exist, set their index and add them to the vertex list
+        int fromIndex = findNode(nodes, x1, y1);
+        int toIndex = findNode(nodes, x2, y2);
+        if (fromIndex == -1) {
+            fromIndex = nodes.size();
+            Node newNode = Node(x1, y1, fromIndex);
+            std::cout << x1 << ", " << y1 << "  =>  " << names[fromIndex] << std::endl;
+            nodes.push_back(newNode);
         }
-        std::string key2 = std::to_string(x2) + keyDelim + std::to_string(y2);
-        if (coordToIndex.find(key2) == coordToIndex.end()) { // not found
-            coordToIndex.emplace(key2, nextMapIndex);
-            std::cout << key2 << "  =>  " << names[nextMapIndex] << std::endl;
-            nextMapIndex++;
+        if (toIndex == -1) {
+            toIndex = nodes.size();
+            Node newNode = Node(x2, y2, toIndex);
+            std::cout << x2 << ", " << y2 << "  =>  " << names[toIndex] << std::endl;
+            nodes.push_back(newNode);
         }
-
-        int fromIndex = coordToIndex[key1];
-        int toIndex = coordToIndex[key2];
 
         // insert zeroes on matching indexes
         dist[fromIndex][fromIndex] = 0;
         dist[toIndex][toIndex] = 0;
 
         // Create vertexes at intersections
-        if (abs(x1-x2) == 1 && abs(y1-y2) == 1) { // only if the edge is a diagonal in the grid
-            std::string reverseKey1 = std::to_string(x1) + keyDelim + std::to_string(y2);
-            std::string reverseKey2 = std::to_string(x2) + keyDelim + std::to_string(y1);
+        if (abs(x1 - x2) == 1 && abs(y1 - y2) == 1) { // only if the edge is a diagonal in the grid
+            int fromIndex2 = findNode(nodes, x1, y2);
+            int toIndex2 = findNode(nodes, x2, y1);
 
-            if (coordToIndex.find(reverseKey1) != coordToIndex.end() && coordToIndex.find(reverseKey2) != coordToIndex.end()) { // both found
-                int fromIndex2 = coordToIndex[reverseKey1];
-                int toIndex2 = coordToIndex[reverseKey2];
+            if (fromIndex2 != -1 && toIndex2 != -1) { // both found
                 float t2 = dist[fromIndex2][toIndex2];
 
                 if (t2 != INF() && t2 != 0) { // edge exists between the reversed nodes
@@ -108,40 +133,33 @@ int main()
 
                     // Create new vertex
 
-                    // map to index
+                    // create new node, set index
                     std::string newKey;
-                    newKey = x1 < x2 ? std::to_string(x1 + 0.5f) : std::to_string(x2 + 0.5f);
-                    newKey = newKey + keyDelim + (y1 < y2 ? std::to_string(y1 + 0.5f) : std::to_string(y2 + 0.5f));
-                    coordToIndex.emplace(newKey, nextMapIndex);
-                    std::cout << newKey << "  =>  " << names[nextMapIndex] << std::endl;
+                    float newX = x1 < x2 ? x1 + 0.5f : x2 + 0.5f;
+                    float newY = y1 < y2 ? y1 + 0.5f : y2 + 0.5f;
+                    int newIndex = nodes.size();
+                    Node newNode = Node(newX, newY, newIndex);
+                    nodes.push_back(newNode);
+                    printf("%.1f, %.1f  =>  %c*\n", newX, newY, names[newIndex]);
 
-                    // alloc new row in the matrix
-                    //dist[n] = new float[allocN];
-                    //for (int k = 0; k < n+1; k++)
-                    //{
-                    //    dist[n][k] = INF();
-                    //}
+                    dist[newIndex][newIndex] = 0;
 
-                    dist[nextMapIndex][nextMapIndex] = 0;
-            
                     // first edge divided
-                    dist[fromIndex][nextMapIndex] = t / 2;
-                    dist[nextMapIndex][toIndex] = t / 2;
+                    dist[fromIndex][newIndex] = t / 2;
+                    dist[newIndex][toIndex] = t / 2;
 
-                    dist[nextMapIndex][fromIndex] = t / 2;
-                    dist[toIndex][nextMapIndex] = t / 2;
+                    dist[newIndex][fromIndex] = t / 2;
+                    dist[toIndex][newIndex] = t / 2;
 
                     // second edge divided
-                    dist[fromIndex2][nextMapIndex] = t2 / 2;
-                    dist[nextMapIndex][toIndex2] = t2 / 2;
+                    dist[fromIndex2][newIndex] = t2 / 2;
+                    dist[newIndex][toIndex2] = t2 / 2;
 
-                    dist[nextMapIndex][fromIndex2] = t2 / 2;
-                    dist[toIndex2][nextMapIndex] = t2 / 2;
+                    dist[newIndex][fromIndex2] = t2 / 2;
+                    dist[toIndex2][newIndex] = t2 / 2;
 
                     // increase matrix size
                     n++;
-                    // increase next map index
-                    nextMapIndex++;
 
                     // skip the full edge weight insert
                     continue;
@@ -166,78 +184,103 @@ int main()
     //    {INF(), INF(), INF(), INF(), 1, 0},  // f
     //};
 
-    float *ecc = new float[nextMapIndex]{ 0 }; // eccentricities
+    int vertexCount = nodes.size();
     float radius = INF();
+    float radius2 = INF();
     float diameter = 0;
 
     std::cout << std::endl << "Floyd-Warshall algorithm" << std::endl << std::endl;
-    for (int k = 0; k < nextMapIndex; k++) {
-        for (int i = 0; i < nextMapIndex; i++) {
-            for (int j = 0; j < nextMapIndex; j++) {
+    for (int k = 0; k < vertexCount; k++) {
+        for (int i = 0; i < vertexCount; i++) {
+            for (int j = 0; j < vertexCount; j++) {
                 float sum = dist[i][k] + dist[k][j];
                 if (dist[i][j] > sum) {
                     dist[i][j] = sum;
                     // Update vertex eccentricity
-                    if (dist[i][j] > ecc[i]) {
-                        ecc[i] = dist[i][j];
+                    if (dist[i][j] > nodes[i].ecc) {
+                        nodes[i].ecc = dist[i][j];
                     }
                 }
             }
         }
     }
+    
+    // Output
 
-    //for (int i = 0; i < nextMapIndex; i++) {
-    //    // Update graph radius and diameter
-    //    if (ecc[i] < radius)
-    //        radius = ecc[i]; // radius = min ecc
-    //    if (ecc[i] > diameter)
-    //        diameter = ecc[i]; // diameter = max ecc
-    //}
-
-    std::sort(ecc, ecc + nextMapIndex);
-    radius = ecc[0];
-    diameter = ecc[nextMapIndex-1];
-
-    for (int i = 0; i < nextMapIndex; i++) {
+    for (int i = 0; i < vertexCount; i++) {
         std::cout << names[i] << "  ";
-        for (int j = 0; j < nextMapIndex; j++) {
-            printf("%1.1f  ", dist[i][j]);
+        for (int j = 0; j < vertexCount; j++) {
+            printf("%.1f  ", dist[i][j]);
         }
-        std::cout << "    ecc(" << names[i] << ") = " << ecc[i] << std::endl;
+        std::cout << "    ecc(" << names[i] << ") = " << nodes[i].ecc << std::endl;
     }
     std::cout << std::endl;
 
+
+    std::sort(nodes.begin(), nodes.end(), &sortByEcc);
+    radius = nodes[0].ecc;
+    radius2 = nodes[1].ecc;
+    diameter = nodes[vertexCount - 1].ecc;
+
     std::cout << "radius = " << radius << std::endl;
+    std::cout << "radius2 = " << radius2 << std::endl;
     std::cout << "diameter = " << diameter << std::endl;
 
+    // print central vertexes
     std::cout << "central vertexes = [ ";
-    for (int i = 0, count = 0; i < nextMapIndex; i++) {
-        if (ecc[i] == radius) {
-            std::cout << names[i];
-            if (count > 0) {
-                std::cout << ", ";
+    for (int i = 0, count = 0; i < vertexCount; i++) {
+        if (nodes[i].ecc == radius) {
+            std::cout << names[nodes[i].index];
+            bool isInteger = floor(nodes[i].x) == nodes[i].x;
+            if (!isInteger) {
+                std::cout << "*";
             }
+            std::cout << ", ";
             count++;
         }
     }
-    std::cout << " ]" << std::endl;
+    std::cout << " ]                         // * = not on integer coordinates" << std::endl;
+
+    // print central vertexes for radius2
+    std::cout << "central vertexes for radius2 = [ ";
+    for (int i = 0, count = 0; i < vertexCount; i++) {
+        if (nodes[i].ecc == radius2) {
+            std::cout << names[nodes[i].index];
+            bool isInteger = floor(nodes[i].x) == nodes[i].x;
+            if (!isInteger) {
+                std::cout << "*";
+            }
+            std::cout << ", ";
+            count++;
+        }
+    }
+    std::cout << " ] " << std::endl << std::endl;
+
+    // Answer
+    std::vector<Node> toCheck;
+    std::cout << "vertexes to check = [ ";
+    for (int i = 0, r = radius; i < vertexCount; i++) {
+        if (nodes[i].ecc == r && floor(nodes[i].x) == nodes[i].x) {
+            toCheck.push_back(nodes[i]);
+            std::cout << names[nodes[i].index] << ", ";
+        }
+
+        // If no central vertexes are found on integer coords, reset the loop and search using radius2
+        if (i == vertexCount - 1 && toCheck.size() == 0) {
+            i = 0;
+            r = radius2;
+            std::cout << "(r = " << radius2 << "): ";
+        }
+    }
+    std::cout << " ] " << std::endl;
+
+    // Burn simulation
+    // ...
 
     // Cleanup
-    delete[] ecc;
 
     for (int i = 0; i < allocN; ++i) {
         delete[] dist[i];
     }
     delete[] dist;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
