@@ -4,26 +4,38 @@
 #include <iostream>
 #include <fstream>
 #include <limits>
-#include <string>
-#include <unordered_map>
 #include <cmath> 
 #include <algorithm>
 #include <vector>
+#include <list>
 
 #define INF std::numeric_limits<float>::infinity
 
-#define INPUT_FILE "ex-2.txt"
+#define INPUT_FILE "ex-12.txt"
 
 struct Node {
     float x;
     float y;
     int index; // index in the matrix and other arrays
     float ecc = 0; // eccentricity
+    float burnTime = 0; // time needed for the graph to burn if ignited from this node
 
     Node(float x, float y, int index) {
         this->x = x;
         this->y = y;
         this->index = index;
+    }
+};
+
+struct BurningStick {
+    int fromIndex;
+    int toIndex;
+    float timeLeft;
+
+    BurningStick(int from, int to, float time) {
+        this->fromIndex = from;
+        this->toIndex = to;
+        this->timeLeft = time;
     }
 };
 
@@ -42,11 +54,33 @@ bool sortByEcc(Node a, Node b) {
     return a.ecc < b.ecc;
 }
 
+void printMatrix(float** matrix, int size, char* names) {
+    for (int i = 0; i < size; i++) {
+        std::cout << names[i] << "  ";
+        for (int j = 0; j < size; j++) {
+            printf("%.1f  ", matrix[i][j]);
+        }
+        std::cout << std::endl;
+    }
+}
+
+std::list<BurningStick>::iterator findBurnByIndexes(std::list<BurningStick>& list, int fromIndex, int toIndex) {
+    for (auto it = list.begin(); it != list.end(); it++)
+    {
+        if (it->fromIndex == fromIndex && it->toIndex == toIndex) {
+            return it;
+        }
+    }
+
+    return list.end();
+}
+
 int main()
 {
     std::cout << "Burning matchsticks\n\n";
 
-    std::ifstream ifs("ex-2.txt");
+    // === 1. Read input and build adjancency matrix and nodes vector ===
+    std::ifstream ifs(INPUT_FILE);
     if (!ifs.is_open())
     {
         std::cout << "Unable to open file" << std::endl;
@@ -158,6 +192,10 @@ int main()
                     dist[newIndex][fromIndex2] = t2 / 2;
                     dist[toIndex2][newIndex] = t2 / 2;
 
+                    // old edge removed
+                    dist[fromIndex2][toIndex2] = INF();
+                    dist[toIndex2][fromIndex2] = INF();
+
                     // increase matrix size
                     n++;
 
@@ -185,6 +223,31 @@ int main()
     //};
 
     int vertexCount = nodes.size();
+
+    // Early return if there's only two vertexes
+    if (vertexCount == 2) {
+        std::cout << std::endl << "=== Final answer ===" << std::endl << "Burning time = " << dist[0][1] << "s for nodes = { " << std::endl;
+        std::cout << "\t" << names[0] << " = (" << nodes[0].x << "," << nodes[0].y << ")" << std::endl;
+        std::cout << "\t" << names[1] << " = (" << nodes[1].x << "," << nodes[1].y << ")" << std::endl;
+        std::cout << "}" << std::endl;
+
+        return 0;
+    }
+
+    // Copy the adjacency matrix
+    float** am = new float* [vertexCount]; // adjacency matrix
+    for (int i = 0; i < vertexCount; ++i) {
+        am[i] = new float[vertexCount];
+        std::memcpy(am[i], dist[i], vertexCount * sizeof(float));
+    }
+
+    std::cout << std::endl << "Adjacency matrix" << std::endl;
+    printMatrix(am, vertexCount, names);
+    std::cout << std::endl;
+    // ---
+
+
+    // === 2. Floyd-Warshall and radiuses ===
     float radius = INF();
     float radius2 = INF();
     float diameter = 0;
@@ -196,10 +259,11 @@ int main()
                 float sum = dist[i][k] + dist[k][j];
                 if (dist[i][j] > sum) {
                     dist[i][j] = sum;
-                    // Update vertex eccentricity
-                    if (dist[i][j] > nodes[i].ecc) {
-                        nodes[i].ecc = dist[i][j];
-                    }
+                }
+
+                // Update vertex eccentricity
+                if ((dist[i][j] >= sum && dist[i][j] != INF()) && dist[i][j] > nodes[i].ecc) {
+                    nodes[i].ecc = dist[i][j];
                 }
             }
         }
@@ -256,7 +320,7 @@ int main()
     }
     std::cout << " ] " << std::endl << std::endl;
 
-    // Answer
+    // Gather vertexes to check (simulate burning)
     std::vector<Node> toCheck;
     std::cout << "vertexes to check = [ ";
     for (int i = 0, r = radius; i < vertexCount; i++) {
@@ -272,15 +336,164 @@ int main()
             std::cout << "(r = " << radius2 << "): ";
         }
     }
-    std::cout << " ] " << std::endl;
+    std::cout << " ] " << std::endl << std::endl;
 
-    // Burn simulation
-    // ...
 
-    // Cleanup
 
+    // === 3. Burning simulation ===
+    int nodesToCheck = toCheck.size();
+    float minBurnTime = INF();
+    for (int k = 0; k < nodesToCheck; k++)
+    {
+        int nodeIndex = toCheck[k].index;
+
+        // Copy the adjacency matrix
+        float** m = new float* [vertexCount]; // adjacency matrix
+        for (int i = 0; i < vertexCount; ++i) {
+            m[i] = new float[vertexCount];
+            std::memcpy(m[i], am[i], vertexCount * sizeof(float));
+        }
+
+        // Burn simulation starting from a given node
+
+        // Using a list for quick removals
+        std::list<BurningStick> times; // remaining edge weights = burning times = lengths
+        int timesSize = 0;
+
+        std::vector<BurningStick> nextElems; // nodes whose neighbours will burn next
+        nextElems.push_back(BurningStick(nodeIndex, nodeIndex, 0)); // the starting node
+
+        bool newNodeReached = true;
+        float totalBurnTime = 0;
+        do {
+            // Spread the fire
+            if (newNodeReached) {
+                int elems = nextElems.size();
+                for (int e = 0; e < elems; e++)
+                {
+                    int elem = nextElems[e].toIndex;
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        // if not burnt out and connected
+                        if (m[elem][i] != 0 && m[elem][i] != INF()) {
+                            // if not burning from the this direction already
+                            //if (findBurnByIndexes(times, elem, i) != times.end()) {
+                                BurningStick burn = BurningStick(elem, i, m[elem][i]);
+                                times.insert(times.end(), burn); // set stick on fire
+                                timesSize++;
+                            //}
+                        }
+                    }
+                }
+                newNodeReached = false;
+                nextElems.clear(); // O(n)
+            }
+
+            // Burn the sticks
+            for (auto it = times.begin(); it != times.end();)
+            {
+                // sticks burning from both ends should update to the latest value which could've been changed on previous iterations
+                it->timeLeft = m[it->fromIndex][it->toIndex];
+
+                if (it->timeLeft > 0) {
+                    it->timeLeft -= 0.25f; // burn tick
+
+                    m[it->fromIndex][it->toIndex] = it->timeLeft;
+                    m[it->toIndex][it->fromIndex] = it->timeLeft;
+
+                    if (it->timeLeft == 0) {
+                        // Remember this node, fire will spread to its neighbours
+                        newNodeReached = true;
+                        nextElems.push_back(*it);
+
+                        // printing
+                        //printMatrix(m, vertexCount, names);
+                        //std::cout << "Burn time = " << totalBurnTime + 0.25f << " (" << names[it->toIndex] << ")" << std::endl << std::endl;
+                        //
+
+                        int from = it->fromIndex, to = it->toIndex;
+                        // delete burnt node
+                        it = times.erase(it);
+                        timesSize--;
+
+                        // delete the second burning for sticks burning from both sides
+                        auto beforeDuplicate = findBurnByIndexes(times, to, from);
+                        if (beforeDuplicate != times.end()) {
+                            auto er = times.erase(beforeDuplicate);
+                            timesSize--;
+                        }
+
+                        if (timesSize == 0) {
+                            break;
+                        }
+                    }
+                    else {
+                        it++;
+                    }
+                }
+                else {
+                    // std::cout << "Error while burning" << std::endl;
+                    // delete leftover burnt node
+                    it = times.erase(it);
+                    timesSize--;
+                }
+            }
+
+            if (newNodeReached) {
+                // it's possible a node that already burnt out was added for spread again
+                newNodeReached = false;
+                int elems = nextElems.size();
+                for (int e = 0; e < elems; e++) {
+                    int elem = nextElems[e].toIndex;
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        // only count the node for spread if at least one of his neighbours has NOT burnt out
+                        if (m[elem][i] != 0 && m[elem][i] != INF()) {
+                            newNodeReached = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            totalBurnTime += 0.25f;
+        } while (timesSize > 0 || newNodeReached);
+
+        toCheck[k].burnTime = totalBurnTime;
+
+        // Update min burn time
+        if (totalBurnTime < minBurnTime) {
+            minBurnTime = totalBurnTime;
+        }
+
+        // Free the matrix memory
+        for (int i = 0; i < vertexCount; ++i) {
+            delete[] m[i];
+        }
+        delete[] m;
+
+        std::cout << "Total burn time = " << totalBurnTime << "s for node " << names[nodeIndex] << " = (" << toCheck[k].x << "," << toCheck[k].y << ")" << std::endl;
+    }
+
+    // Final answer
+    std::cout << std::endl << "=== Final answer ===" << std::endl << "Burning time = " << minBurnTime << "s for nodes = { " << std::endl;
+    for (int i = 0; i < nodesToCheck; i++)
+    {
+        if (toCheck[i].burnTime == minBurnTime) {
+            std::cout << "   " << names[toCheck[i].index] << " = (" << toCheck[i].x << "," << toCheck[i].y << ")" << std::endl;
+        }
+    }
+    std::cout << "}" << std::endl;
+
+
+
+    // === 4. Cleanup ===
     for (int i = 0; i < allocN; ++i) {
         delete[] dist[i];
+        if (i < vertexCount) {
+            delete[] am[i];
+        }
     }
     delete[] dist;
+    delete[] am;
 }

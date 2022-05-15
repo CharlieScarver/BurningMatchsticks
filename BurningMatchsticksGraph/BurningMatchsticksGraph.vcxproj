@@ -150,9 +150,13 @@
     <ClCompile Include="BurningMatchsticksGraph.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="ex-1.txt" />
     <Text Include="ex-11.txt" />
+    <Text Include="ex-12.txt" />
     <Text Include="ex-2.txt" />
     <Text Include="ex-3.txt" />
+    <Text Include="ex-4.txt" />
+    <Text Include="ex-5.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

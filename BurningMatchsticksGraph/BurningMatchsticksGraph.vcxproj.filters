@@ -29,5 +29,17 @@
     <Text Include="ex-11.txt">
       <Filter>Source Files</Filter>
     </Text>
+    <Text Include="ex-1.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+    <Text Include="ex-4.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+    <Text Include="ex-5.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+    <Text Include="ex-12.txt">
+      <Filter>Source Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>
