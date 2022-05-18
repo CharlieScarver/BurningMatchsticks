@@ -10,8 +10,9 @@
 #include <list>
 
 #define INF std::numeric_limits<float>::infinity
+#define MAX_NODES 38
 
-#define INPUT_FILE "ex-12.txt"
+#define INPUT_FILE "ex-7.txt"
 
 struct Node {
     float x;
@@ -97,9 +98,9 @@ int main()
         return 2;
     }
 
-    if (n >= 26) {
+    if (n >= MAX_NODES) {
         ifs.close();
-        std::cout << "The number of sticks has to be < 26 to assign vertex letters" << std::endl;
+        std::cout << "The number of sticks has to be < " << MAX_NODES << " to assign vertex letters" << std::endl;
         return 5;
     }
 
@@ -116,7 +117,7 @@ int main()
 
     std::vector<Node> nodes; // list of all vertexes
     std::string keyDelim = ", ";
-    char names[26] = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' }; // vertex names
+    char names[MAX_NODES] = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '[', ']', '{', '}', '(', ')', '-', '=', '+', ',', '.', '/' }; // vertex names
     std::cout << "Vertex => Name" << std::endl;
 
     for (int i = 0, initN = n; i < initN; i++)
